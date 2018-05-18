@@ -21,6 +21,15 @@ volatile boolean pressingButton = false;
 CRGB ui_leds[NUM_LEDS];
 CRGB strip_leds[NUM_LEDS];
 
+// set up global state management for ui lights
+int UI_POWER = 0;
+int UI_PLUS = 1;
+int UI_MINUS = 2;
+int UI_SHUFFLE = 3;
+int UI_BUTTON_COUNT = 4;
+
+int UI_BRIGHTNESS[] = {0, 0, 0, 0};
+
 void setup() {
   Serial.begin(9600);
 
@@ -31,14 +40,18 @@ void setup() {
   }
   Serial.println("CAP1188 found!");
   pinMode(3, INPUT);
+  // sensitivity
+  cap.writeRegister(0x1F, 0x6F);  // 8x  sensitivity
   // Turn off multitouch so only one button pressed at a time
   cap.writeRegister(0x2A, 0x80);  // 0x2A default 0x80 use 0x41  — Set multiple touches back to off
-  cap.writeRegister(0x41, 0x39);  // 0x41 default 0x39 use 0x41  — Set "speed up" setting back to off
-  cap.writeRegister(0x72, 0x00);  // 0x72 default 0x00  — Sets LED links back to off (default)
-  cap.writeRegister(0x44, 0x41);  // 0x44 default 0x40 use 0x41  — Set interrupt on press but not release
-  cap.writeRegister(0x28, 0x00);  // 0x28 default 0xFF use 0x00  — Turn off interrupt repeat on button hold
+//  cap.writeRegister(0x41, 0x39);  // 0x41 default 0x39 use 0x41  — Set "speed up" setting back to off
+//  cap.writeRegister(0x72, 0x00);  // 0x72 default 0x00  — Sets LED links back to off (default)
+//  cap.writeRegister(0x44, 0x41);  // 0x44 default 0x40 use 0x41  — Set interrupt on press but not release
+//  cap.writeRegister(0x28, 0x00);  // 0x28 default 0xFF use 0x00  — Turn off interrupt repeat on button hold
   EIFR = 1; // clear flag for interrupt 1
   attachInterrupt(1, routine_Interrupt_CAP1188, FALLING);
+
+  FastLED.addLeds<NEOPIXEL, UI_LEDS_DATA_PIN>(ui_leds, NUM_LEDS);
 
   // Force LEDs off
   fill_solid(ui_leds, NUM_LEDS, CRGB::Black);
@@ -53,25 +66,11 @@ void loop() {
   if (interrupt == true) {
   for (uint8_t i=0; i<8; i++) {
     if (touched & (1 << i)) {
-      Serial.print("Touching"); Serial.print(i+1);
-      Serial.println();
+      Serial.print("C"); Serial.print(i+1); Serial.print("\t");
     }
   }
     interrupt = false;
   }
-
-  if (touched == 0) {
-    // No touch detected
-    // return;
-  }
-
-//  Serial.println(touched);
-//  for (uint8_t i=0; i<8; i++) {
-//    if (touched & (1 << i)) {
-//      Serial.print("Touching"); Serial.print(i+1);
-//      Serial.println();
-//    }
-//  }
 }
 
 void routine_Interrupt_CAP1188()  {
@@ -79,16 +78,26 @@ void routine_Interrupt_CAP1188()  {
 }
 
 void powerUpSequence() {
-  static uint8_t currentBrightness = 255;
+  static uint8_t currentBrightness = 0;
+  static uint8_t maxBrightness = 255 * 0.3;
   int fadeAmount = 5;
 
   static const float duration = ((float)(7.5) / 256)*1000;
 
   // set this to max bright - 255 = off, 0 = maximum bright
-  while(currentBrightness != 0) {
-    currentBrightness -= 5;
-    fill_solid(ui_leds, NUM_LEDS, CRGB::White);
-    fadeLightBy(ui_leds, NUM_LEDS, currentBrightness);
+  while(currentBrightness < maxBrightness) {
+    currentBrightness += 5;
+//    fill_solid(ui_leds, NUM_LEDS, CRGB::White);
+//    fadeLightBy(ui_leds, NUM_LEDS, currentBrightness);
+//    FastLED.show();
+//    delay(duration);
+
+    for (int uiButton = 0; uiButton < UI_BUTTON_COUNT; uiButton++) {
+      ui_leds[uiButton] = CRGB::White;
+      UI_BRIGHTNESS[uiButton] = currentBrightness;
+      ui_leds[uiButton].maximizeBrightness(UI_BRIGHTNESS[uiButton]);
+    }
+
     FastLED.show();
     delay(duration);
   }
