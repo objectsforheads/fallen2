@@ -28,6 +28,13 @@ int UI_MINUS = 2;
 int UI_SHUFFLE = 3;
 int UI_BUTTON_COUNT = 4;
 
+
+boolean UI_IS_PRESSED = false;
+int UI_WHICH_PRESSED;
+int UI_PRESS_START;
+int UI_PRESS_TIME;
+int UI_PRESS_END;
+
 int UI_BRIGHTNESS[] = {0, 0, 0, 0};
 
 void setup() {
@@ -42,6 +49,7 @@ void setup() {
   pinMode(3, INPUT);
   // sensitivity
   cap.writeRegister(0x1F, 0x6F);  // 8x  sensitivity
+  // https://learn.adafruit.com/adafruit-cap1188-breakout/using-with-arduino
   // Turn off multitouch so only one button pressed at a time
   cap.writeRegister(0x2A, 0x80);  // 0x2A default 0x80 use 0x41  — Set multiple touches back to off
 //  cap.writeRegister(0x41, 0x39);  // 0x41 default 0x39 use 0x41  — Set "speed up" setting back to off
@@ -63,14 +71,51 @@ void loop() {
   // Serial.println(digitalRead(3));
   uint8_t touched = cap.touched();
 
-  if (interrupt == true) {
+  int pressed = 9999;
   for (uint8_t i=0; i<8; i++) {
     if (touched & (1 << i)) {
-      Serial.print("C"); Serial.print(i+1); Serial.print("\t");
+      pressed = i;
     }
   }
-    interrupt = false;
+
+  // initialize pressed state if it's not in it already
+  if (pressed < UI_BUTTON_COUNT & !UI_IS_PRESSED) {
+    UI_IS_PRESSED = true;
+    UI_WHICH_PRESSED = pressed;
+    UI_PRESS_START = millis();
   }
+
+  // maintain the duration of the press
+  if (pressed < UI_BUTTON_COUNT & UI_IS_PRESSED) {
+    UI_PRESS_TIME = millis() - UI_PRESS_START;
+  }
+
+  // on release, calculate the time we held the button for
+  if (pressed == 9999 && UI_IS_PRESSED) {
+    UI_IS_PRESSED = false;
+    UI_PRESS_END = millis();
+  }
+
+  if (UI_PRESS_TIME > 1000) {
+//    toBrightness(255, 255, ui_leds[UI_WHICH_PRESSED]);
+    ui_leds[UI_WHICH_PRESSED] = CRGB::Red;
+    FastLED.show();
+  }
+
+//  int pressed = 99; // utterly false number bc idk how to do multiple typecasting atm
+//  if (interrupt == true) {
+//
+//    for (uint8_t i=0; i<8; i++) {
+//      if (touched & (1 << i)) {
+//        pressed = i + 1;
+//        UI_IS_PRESSED = true;
+//        UI_WHICH_PRESSED = i;
+//        UI_PRESS_START = millis();
+//        Serial.println(pressed);
+//      }
+//    }
+//    interrupt = false;
+//  }
 }
 
 void routine_Interrupt_CAP1188()  {
@@ -87,10 +132,6 @@ void powerUpSequence() {
   // set this to max bright - 255 = off, 0 = maximum bright
   while(currentBrightness < maxBrightness) {
     currentBrightness += 5;
-//    fill_solid(ui_leds, NUM_LEDS, CRGB::White);
-//    fadeLightBy(ui_leds, NUM_LEDS, currentBrightness);
-//    FastLED.show();
-//    delay(duration);
 
     for (int uiButton = 0; uiButton < UI_BUTTON_COUNT; uiButton++) {
       ui_leds[uiButton] = CRGB::White;
@@ -102,3 +143,11 @@ void powerUpSequence() {
     delay(duration);
   }
 }
+
+//void toBrightness(currentBrightness, maxBrightness, led) {
+//  int fadeAmount = 5;
+//  static const float duration = ((float)(7.5) / 256)*1000;
+//
+//  led = CRGB::Red;
+//  FadeLED.show();
+//}
