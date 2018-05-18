@@ -34,6 +34,7 @@ int UI_WHICH_PRESSED;
 int UI_PRESS_START;
 int UI_PRESS_TIME;
 int UI_PRESS_END;
+int UI_PRESS_TIME_SINCE = 0;
 
 int UI_BRIGHTNESS[] = {0, 0, 0, 0};
 
@@ -83,6 +84,7 @@ void loop() {
     UI_IS_PRESSED = true;
     UI_WHICH_PRESSED = pressed;
     UI_PRESS_START = millis();
+    UI_PRESS_TIME_SINCE = 0;
   }
 
   // maintain the duration of the press
@@ -93,12 +95,29 @@ void loop() {
   // on release, calculate the time we held the button for
   if (pressed == 9999 && UI_IS_PRESSED) {
     UI_IS_PRESSED = false;
+    UI_PRESS_TIME = 0;
     UI_PRESS_END = millis();
+    ui_leds[UI_WHICH_PRESSED] = CRGB::White;
+    FastLED.show();
+  }
+
+  if (!UI_IS_PRESSED) {
+    UI_PRESS_TIME_SINCE = millis() - UI_PRESS_END;
   }
 
   if (UI_PRESS_TIME > 1000) {
 //    toBrightness(255, 255, ui_leds[UI_WHICH_PRESSED]);
     ui_leds[UI_WHICH_PRESSED] = CRGB::Red;
+    FastLED.show();
+  }
+
+  if (!UI_IS_PRESSED & UI_PRESS_TIME_SINCE > 2500) {
+    for (int uiButton = 0; uiButton < UI_BUTTON_COUNT; uiButton++) {
+      ui_leds[uiButton] = CRGB::White;
+      UI_BRIGHTNESS[uiButton] = 0;
+      ui_leds[uiButton].maximizeBrightness(UI_BRIGHTNESS[uiButton]);
+    }
+
     FastLED.show();
   }
 
